@@ -44,9 +44,9 @@ var tests = [
 	['date object (epoch)', new Date(0) ],
 	['date object (now)', new Date() ],
 	// plain objects
-	['empty object', {} ],
-	['keyed object', { foo:'bar', 'foo bar':'baz' } ],
-	['refs object', { foo: _ = { a: 12 }, bar: _ } ]
+	['empty object', { type: 'Object' } ],
+	['keyed object', { type: 'Object', foo:'bar', 'foo bar':'baz' } ],
+	['refs object', { type: 'Object', foo: _ = { type: 'Object', a: 12 }, bar: _ } ]
 ];
 
 
