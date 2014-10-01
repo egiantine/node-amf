@@ -1,6 +1,6 @@
 {
-  "name": "amflib",
-  "version": "1.0.1",
+  "name": "amflibx",
+  "version": "1.0.2",
   "author": "Tim Whitlock (http://timwhitlock.info)",
   "description": "AMF library for NodeJS",
   "scripts": {
@@ -9,7 +9,7 @@
   "main": "./node-amf/http-server",
   "repository": {
     "type": "git",
-    "url": "https://github.com/brightcove/node-amf"
+    "url": "https://github.com/egiantine/node-amf"
   },
   "keywords": [
     "flash",
