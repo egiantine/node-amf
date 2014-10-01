@@ -5,8 +5,6 @@
 /** dependencies */ 
 var amf = require('./amf');
 var utils = require('./utils');
-var utf8 = require('./utf8');
-var bin = require('./bin');
 
 
 /** export constructor */
@@ -20,67 +18,66 @@ exports.AMFDeserializer = AMFDeserializer;
 
 /** Constructor */
 function AMFDeserializer( src ){
-	this.s = src || '';
+	this.s = new Buffer(src, 'binary');
 	this.i = 0;
 	this.resetRefs();
-	this.beParser = bin.parser( true, true );  // <- big endian binary unpacker
-	this.leParser = bin.parser( false, true ); // <- little endian binary unpacker
 }
 
+
+/** */
+AMFDeserializer.prototype.pos = function(){
+        return this.i;
+}
+
+
+/** */
+AMFDeserializer.prototype.shiftPos = function( inc ){
+        this.i += inc;
+}
 
 
 /** */
 AMFDeserializer.prototype.resetRefs = function(){
-	this.refObj = []; // object references
-	this.refStr = []; // string references
-	this.refTra = []; // trait references
+	this.refObj = [];  // object references
+	this.refBufStart = []; // buffer start references
+	this.refBufEnd = [];   // buffer end references
+	this.refTra = [];  // trait references
 }
 
-
-
-/** */
-AMFDeserializer.prototype.shiftBytes = function( n ){
-	if( n === 0 ){
-		return '';
-	} 
-	var s = this.s.slice( 0, n );
-	if( s.length !== n ){
-		throw new Error("Not enough input to read "+n+" bytes, got "+s.length+", offset "+this.i);
-	}
-	this.s = this.s.slice(n);
-	this.i += n;
-	return s;
-}
-	
 	
 /** */	
 AMFDeserializer.prototype.readU8 = function(){
-	var s = this.shiftBytes(1);
-	return s.charCodeAt(0);
+	var s = this.s.readUInt8(this.pos());
+	this.shiftPos(1);
+        return s;
 }
 
 
 /** */
 AMFDeserializer.prototype.readU16 = function (){
-	var s = this.shiftBytes(2);
-	return this.beParser.toWord( s );
+	var s = this.s.readUInt16BE(this.pos());
+        this.shiftPos(2);
+	return s;
 }
 
 
 /** */
 AMFDeserializer.prototype.readU32 = function(){
-	var s = this.shiftBytes(4);
-	return this.beParser.toDWord( s );
+	var s = this.s.readUInt32BE(this.pos());
+        this.shiftPos(4);
+        return s;
 }
 
 
 /** */
 AMFDeserializer.prototype.readDouble = function(){
-	var s = this.shiftBytes(8);
-	if( '\0\0\0\0\0\0\xF8\x7F' === s ){
-		return Number.NaN;
-	}
-	return this.beParser.toDouble( s );
+	var s = Number.NaN;
+        if ( this.s.readUInt32BE(this.pos()) !== 0 ||
+             this.s.readUInt32BE(this.pos()+4) !==  0xf87f ){
+                s = this.s.readDoubleBE(this.pos());
+        }
+        this.shiftPos(8);
+        return s; 
 }
 
 
@@ -133,7 +130,7 @@ AMFDeserializer.prototype.readInteger = function( version ){
 
 /** */
 AMFDeserializer.prototype.readUTF8 = function( version ){
-	var str, len;
+	var start, end, len;
 	// AMF3 supports string references
 	if( version === amf.AMF3 || version == null ){
 		var n = this.readU29();
@@ -143,23 +140,30 @@ AMFDeserializer.prototype.readUTF8 = function( version ){
 			if( len === 0 ){
 				return '';
 			}
-			str = this.shiftBytes( len );
-			this.refStr.push( str );
+                        start = this.pos();
+                        end = start + len;
+                        this.shiftPos(len);
+			this.refBufStart.push( start );
+			this.refBufEnd.push( end );
 		}
 		else {
 			var idx = n >> 1;
-			if( this.refStr[idx] == null ){
+			if( this.refBufStart[idx] == null ){
 				throw new Error("No string reference at index "+idx+", offset "+this.i);
 			}
-			str = this.refStr[idx];
+			start = this.refBufStart[idx];
+			end = this.refBufEnd[idx];
 		}
 	}
 	// else simple AMF0 string
 	else {
 		len = this.readU16();
-		str = this.shiftBytes( len );
+		start = this.pos();
+                end = start + len;
+                this.shiftPos( len );
 	}
-	return utf8.collapse(str);
+        // TODO(egiantine): benchmark whether it'd be cheaper to store these strings instead of start/end positions.
+	return this.s.toString('utf8', start, end);
 }
 
 
